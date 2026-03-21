@@ -1,8 +1,5 @@
-streamlit
 ultralytics
-opencv-python-headless
-torch
-torchvision
-numpy
+streamlit
 pillow
-matplotlib
+numpy
+opencv-python-headless
