@@ -4,6 +4,7 @@ from PIL import Image
 import numpy as np
 from collections import Counter
 import cv2
+import pandas as pd
 
 # ---------------- PAGE CONFIG ----------------
 st.set_page_config(
@@ -12,8 +13,23 @@ st.set_page_config(
     layout="wide"
 )
 
+# ---------------- UI STYLE ----------------
+st.markdown("""
+<style>
+.stApp {
+    background: linear-gradient(135deg, #1e1e2f, #121212);
+    color: white;
+}
+div[data-testid="stMetric"] {
+    background: rgba(255,255,255,0.1);
+    padding: 10px;
+    border-radius: 10px;
+}
+</style>
+""", unsafe_allow_html=True)
+
 st.title("🚀 Neural Vision Engine")
-st.subheader("AI-Powered Intelligent Detection System")
+st.subheader("AI-powered real-time intelligent monitoring system")
 
 # ---------------- MODEL ----------------
 @st.cache_resource
@@ -36,9 +52,12 @@ with st.sidebar:
 
     input_mode = st.radio("Input Mode", ["Image Upload", "Webcam"])
 
-# ---------------- HISTORY ----------------
+# ---------------- SESSION DATA ----------------
 if "history" not in st.session_state:
     st.session_state.history = []
+
+if "data" not in st.session_state:
+    st.session_state.data = []
 
 # =========================================================
 # ================= IMAGE UPLOAD MODE ======================
@@ -75,10 +94,10 @@ if input_mode == "Image Upload":
                 for box in results[0].boxes
             ]
 
+            counts = Counter(detected_classes)
+
             # -------- ANALYTICS --------
             st.markdown("## 📊 Analytics")
-
-            counts = Counter(detected_classes)
 
             colA, colB, colC = st.columns(3)
             colA.metric("Total Objects", len(detected_classes))
@@ -88,23 +107,30 @@ if input_mode == "Image Upload":
             for obj, count in counts.items():
                 st.write(f"🔹 {obj}: {count}")
 
+            # -------- GRAPH --------
+            st.session_state.data.append(len(detected_classes))
+            df = pd.DataFrame(st.session_state.data, columns=["Objects"])
+            st.line_chart(df)
+
             # -------- ALERT SYSTEM --------
             st.markdown("## 🚨 AI Alerts")
 
-            alert = None
-
             if mode == "Industrial Safety":
                 if "person" in detected_classes and "helmet" not in detected_classes:
-                    alert = "⚠️ Safety Violation: No Helmet!"
+                    st.error("⚠️ Safety Violation: No Helmet!")
+                else:
+                    st.success("✅ Safe")
 
             elif mode == "Traffic Monitoring":
-                if counts.get("car", 0) > 5:
-                    alert = "🚗 Traffic Congestion Detected!"
+                if counts.get("car", 0) > 3:
+                    st.error("🚗 Heavy Traffic Detected!")
+                elif counts.get("car", 0) > 1:
+                    st.warning("⚠️ Moderate Traffic")
+                else:
+                    st.success("✅ Smooth Traffic")
 
-            if alert:
-                st.error(alert)
             else:
-                st.success("✅ No Issues Detected")
+                st.info("ℹ️ General Detection Mode")
 
             # -------- DOWNLOAD --------
             output_path = "output.jpg"
@@ -140,7 +166,8 @@ elif input_mode == "Webcam":
             st.warning("Camera not working")
             break
 
-        results = model(frame, conf=confidence)
+        # -------- TRACKING --------
+        results = model.track(frame, conf=confidence, persist=True)
         res_plotted = results[0].plot()
 
         FRAME_WINDOW.image(res_plotted)
@@ -153,19 +180,21 @@ elif input_mode == "Webcam":
 
         counts = Counter(detected_classes)
 
-        # -------- ALERT --------
-        alert = None
+        # -------- GRAPH --------
+        st.session_state.data.append(len(detected_classes))
+        df = pd.DataFrame(st.session_state.data, columns=["Objects"])
+        st.line_chart(df)
 
+        # -------- ALERT --------
         if mode == "Industrial Safety":
             if "person" in detected_classes and "helmet" not in detected_classes:
-                alert = "⚠️ No Helmet Detected!"
+                st.error("⚠️ No Helmet Detected!")
 
         elif mode == "Traffic Monitoring":
-            if counts.get("car", 0) > 5:
-                alert = "🚗 Traffic Congestion!"
-
-        if alert:
-            st.error(alert)
+            if counts.get("car", 0) > 3:
+                st.error("🚗 Heavy Traffic!")
+            elif counts.get("car", 0) > 1:
+                st.warning("⚠️ Moderate Traffic")
 
     cap.release()
 
